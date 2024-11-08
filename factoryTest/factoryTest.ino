@@ -32,7 +32,7 @@
 /********************************* lora  *********************************************/
 #define RF_FREQUENCY                                922000000 // Hz
  
-#define TX_OUTPUT_POWER                             -5        // dBm
+#define TX_OUTPUT_POWER                             0        // dBm
 
 #define LORA_BANDWIDTH                              0         // [0: 125 kHz,
                                                               //  1: 250 kHz,
@@ -67,7 +67,6 @@ typedef enum {
 }
 
 States_t;
-
 int16_t txNumber;
 int16_t rxNumber;
 States_t state;
@@ -90,6 +89,7 @@ int interval = 1000;          // interval between sends
 uint64_t chipid;
 int16_t RssiDetection = 0;
 
+unsigned int sleep_duration = 10; // sleep duration in seconds
 
 void OnTxDone(void) {
   	Serial.print("TX done......");
@@ -97,7 +97,7 @@ void OnTxDone(void) {
 }
 
 void OnTxTimeout(void) {
-    Radio.Sleep( );
+    Radio.Sleep(); // 
     Serial.print("TX Timeout......");
 	state=STATE_TX;
 }
@@ -108,7 +108,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
     rxSize=size;
     memcpy(rxpacket, payload, size );
     rxpacket[size]='\0';
-    Radio.Sleep( );
+    Radio.Sleep();
 
     Serial.printf("\r\nreceived packet \"%s\" with Rssi %d , length %d\r\n",rxpacket,Rssi,rxSize);
     Serial.println("wait to send next packet");
@@ -127,17 +127,21 @@ void lora_init(void) {
     RadioEvents.TxTimeout = OnTxTimeout;
     RadioEvents.RxDone = OnRxDone;
 
-    Radio.Init( &RadioEvents );
-    Radio.SetChannel( RF_FREQUENCY );
-    Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
-                                   LORA_SPREADING_FACTOR, LORA_CODINGRATE,
-                                   LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
-                                   true, 0, 0, LORA_IQ_INVERSION_ON, 3000 );
+    Radio.Init(&RadioEvents);
+    Radio.SetChannel(RF_FREQUENCY);
+    Radio.SetTxConfig(
+		MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
+		LORA_SPREADING_FACTOR, LORA_CODINGRATE,
+		LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
+		true, 0, 0, LORA_IQ_INVERSION_ON, 3000
+		);
 
-    Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
-                                   LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
-                                   LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
-                                   0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
+    Radio.SetRxConfig(
+		MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
+		LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
+		LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
+		0, true, 0, 0, LORA_IQ_INVERSION_ON, true
+		);
 	state=STATE_TX;
 }
 
@@ -150,7 +154,14 @@ void lora_send(void) {
 
 
 /********************************* lora  *********************************************/
-SSD1306Wire  factory_display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_64_32, RST_OLED); // addr , freq , i2c group , resolution , rst
+SSD1306Wire  oled_display(
+	0x3c, 			// addr
+	500000, 		// frequency
+	SDA_OLED, 		// i2c
+	SCL_OLED, 		// i2c
+	GEOMETRY_64_32, // resolution
+	RST_OLED		// rst
+);
 
 void WIFISetUp(void) {
 	// Set WiFi to station mode and disconnect from an AP if it was previously connected
@@ -158,27 +169,27 @@ void WIFISetUp(void) {
 	delay(100);
 	WiFi.mode(WIFI_STA);
 	WiFi.setAutoReconnect(true);
-	WiFi.begin("TP-LINK_B8BC","heltec_test");//fill in "Your WiFi SSID","Your Password"
+	WiFi.begin("GeekSloth","heltec_test");	//fill in "Your WiFi SSID","Your Password"
 	delay(100);
 	byte count = 0;
 	while(WiFi.status() != WL_CONNECTED && count < 10) {
 		count ++;
 		delay(500);
-		factory_display.drawString(0, 0, "Connecting...");
-		factory_display.display();
+		oled_display.drawString(0, 0, "Connecting...");
+		oled_display.display();
 	}
 
-	factory_display.clear();
+	oled_display.clear();
 	if(WiFi.status() == WL_CONNECTED) {
-		factory_display.drawString(0, 8, "OK.");
-		factory_display.display();
+		oled_display.drawString(0, 8, "OK.");
+		oled_display.display();
 	} else{
-		factory_display.clear();
-		factory_display.drawString(0, 8, "Failed");
-		factory_display.display();
+		oled_display.clear();
+		oled_display.drawString(0, 8, "Failed");
+		oled_display.display();
 	}
-	factory_display.drawString(0, 16, "WIFI Setup done");
-	factory_display.display();
+	oled_display.drawString(0, 16, "WIFI Setup done");
+	oled_display.display();
 	delay(500);
 }
 
@@ -186,34 +197,33 @@ void WIFIScan(unsigned int value) {
 	unsigned int i;
     WiFi.mode(WIFI_STA);
 	for(i=0;i<value;i++) {
-		factory_display.drawString(0, 0, "Scan start...");
-		factory_display.display();
+		oled_display.drawString(0, 0, "Scan start...");
+		oled_display.display();
 		int n = WiFi.scanNetworks();
-		factory_display.drawString(0, 30, "Scan done");
-		factory_display.display();
+		oled_display.drawString(0, 30, "Scan done");
+		oled_display.display();
 		delay(500);
-		factory_display.clear();
+		oled_display.clear();
 
 		if (n == 0)	{
-			factory_display.clear();
-			factory_display.drawString(0, 0, "no network found");
-			factory_display.display();
-			//while(1);
+			oled_display.clear();
+			oled_display.drawString(0, 0, "no network found");
+			oled_display.display();
 		} else {
-			factory_display.drawString(0, 0, (String)n);
-			factory_display.drawString(14, 0, "networks");
-            factory_display.drawString(0, 6, "found");
-			factory_display.display();
+			oled_display.drawString(0, 0, (String)n);
+			oled_display.drawString(14, 0, "networks");
+            oled_display.drawString(0, 6, "found");
+			oled_display.display();
 			delay(500);
 		}
-		factory_display.display();
+		oled_display.display();
 		delay(800);
-		factory_display.clear();
+		oled_display.clear();
 	}
 }
 
-bool resendflag=false;
-bool deepsleepflag=false;
+bool resend_flag=false;
+bool deepsleep_flag=false;
 bool interrupt_flag = false;
 
 void interrupt_GPIO0() {
@@ -221,18 +231,14 @@ void interrupt_GPIO0() {
 }
 
 void interrupt_handle(void) {
-	if(interrupt_flag)
-	{
+	if(interrupt_flag) {
 		interrupt_flag = false;
-		if(digitalRead(0)==0)
-		{
-			if(rxNumber <=2)
-			{
-				resendflag=true;
-			}
-			else
-			{
-				deepsleepflag=true;
+		if(digitalRead(0)==0) { 
+			if(rxNumber <=2) {
+				resend_flag=true;
+			} else {
+				// resend_flag=true;
+				deepsleep_flag=true; // use this flag if want to use deepsleep mode
 			}
 		}
 	}
@@ -245,7 +251,7 @@ void VextON(void) {
   
 }
 
-void VextOFF(void){ //Vext default OFF
+void VextOFF(void) { //Vext default OFF
   pinMode(Vext,OUTPUT);
   digitalWrite(Vext, HIGH);
 }
@@ -259,17 +265,17 @@ void setup() {
 	Serial.printf("ESP32ChipID=%04X",(uint16_t)(chipid>>32));//print High 2 bytes
 	Serial.printf("%08X\n",(uint32_t)chipid);//print Low 4bytes.
 
-	factory_display.init();
-    factory_display.clear();
-    factory_display.display();
+	oled_display.init();
+    oled_display.clear();
+    oled_display.display();
 
-    factory_display.drawString(0, 0, "Test Start");
-	factory_display.display();
-    factory_display.clear();
+    oled_display.drawString(0, 0, "Test Start");
+	oled_display.display();
+    oled_display.clear();
 	//delay(500);
 
 	WIFISetUp();
-    factory_display.clear();
+    oled_display.clear();
 	WiFi.disconnect(); //
 	WiFi.mode(WIFI_STA);
 	delay(500);
@@ -278,90 +284,97 @@ void setup() {
 
     attachInterrupt(0,interrupt_GPIO0,FALLING);
 
-	packet ="922MHz Test!";
-    factory_display.drawString(0, 0, packet);
-    factory_display.display();
+	packet = (String)RF_FREQUENCY + "Hz";
+    oled_display.drawString(0, 0, packet);
+    oled_display.display();
     delay(100);
-    factory_display.clear();
+    oled_display.clear();
 	pinMode(LED ,OUTPUT);
 	digitalWrite(LED, LOW);  
 }
 
 
 void loop() {
-    interrupt_handle();
-    if(deepsleepflag) {
-	VextOFF();
-	Radio.Sleep();
+	interrupt_handle();
+	if(deepsleep_flag) {
+		VextOFF();
+		Radio.Sleep();
 
-	pinMode(RADIO_DIO_1,ANALOG);
-	pinMode(RADIO_NSS,ANALOG);
-	pinMode(RADIO_RESET,ANALOG);
-	pinMode(RADIO_BUSY,ANALOG);
-	pinMode(LORA_CLK,ANALOG);
-	pinMode(LORA_MISO,ANALOG);
-	pinMode(LORA_MOSI,ANALOG);
-    pinMode(LED,ANALOG);
-    pinMode(Vext,ANALOG);
-    detachInterrupt(0);
-    Wire.end();
-    //Serial.end(true);
-    SPI.end();
-    WiFi.mode(WIFI_OFF);
-	esp_sleep_enable_timer_wakeup(600*1000*(uint64_t)1000);
-	esp_deep_sleep_start();
- }
+		/*
+		* not actually know why these pins are set to ANALOG mode, but it works.
+		* may try to remove these lines and see if it still works later.
+		*/
+		pinMode(RADIO_DIO_1, ANALOG);
+		pinMode(RADIO_NSS, ANALOG);
+		pinMode(RADIO_RESET, ANALOG);
+		pinMode(RADIO_BUSY, ANALOG);
+		pinMode(LORA_CLK, ANALOG);
+		pinMode(LORA_MISO, ANALOG);
+		pinMode(LORA_MOSI, ANALOG);
+		pinMode(LED, ANALOG);
+		pinMode(Vext, ANALOG);
 
- if(resendflag) {
-	state = STATE_TX; 
-	resendflag = false;
- }
 
-if(receiveflag && (state==LOWPOWER)){
-	receiveflag = false;
-	packet ="R:";
-	int i = 0;
-	while(i < rxSize) {
-		packet += rxpacket[i];
-		i++;
+		detachInterrupt(0);
+		Wire.end();
+		//Serial.end(true);
+		SPI.end();
+		WiFi.mode(WIFI_OFF);
+		esp_sleep_enable_timer_wakeup(sleep_duration * 1000 * (uint64_t)1000);
+		esp_deep_sleep_start();
 	}
-	packSize = "Rssi: ";
-	packSize += String(Rssi,DEC);
-	send_num = "S: ";
-	send_num += String(txNumber,DEC);
-	factory_display.drawString(0, 0, "LoRa");
-    factory_display.drawString(0, 10, packet);
-    factory_display.drawString(0, 20, packSize);
-    factory_display.drawString(32, 0, send_num);
-    factory_display.display();
-    delay(10);
-    factory_display.clear();
 
-    if((rxNumber%2)==0) {
-        digitalWrite(LED, HIGH);  
-    } else {
-        digitalWrite(LED, LOW);
-    }
+	if(resend_flag) {
+		state = STATE_TX; 
+		resend_flag = false;
+	}
 
-}
-switch(state) {
-    case STATE_TX:
-      delay(1000);
-      txNumber++;
-      sprintf(txpacket,"hello %d,Rssi:%d",txNumber,Rssi);
-      Serial.printf("\r\nsending packet \"%s\" , length %d\r\n",txpacket, strlen(txpacket));
-      Radio.Send( (uint8_t *)txpacket, strlen(txpacket) );
-      state=LOWPOWER;
-      break;
-    case STATE_RX:
-      Serial.println("into RX mode");
-      Radio.Rx( 0 );
-      state=LOWPOWER;
-      break;
-    case LOWPOWER:
-      Radio.IrqProcess( );
-      break;
-    default:
-      break;
-  }
+	if(receiveflag && (state==LOWPOWER)) {
+		receiveflag = false;
+		packet ="R:";
+		int i = 0;
+		while(i < rxSize) {
+			packet += rxpacket[i];
+			i++;
+		}
+		packSize = "Rssi: ";
+		packSize += String(Rssi, DEC);
+		send_num = "S: ";
+		send_num += String(txNumber, DEC);
+		oled_display.drawString(0, 0, "LoRa");
+		oled_display.drawString(0, 10, packet);
+		oled_display.drawString(0, 20, packSize);
+		oled_display.drawString(32, 0, send_num);
+		oled_display.display();
+		delay(10);
+		oled_display.clear();
+
+		if((rxNumber%2)==0) {
+			digitalWrite(LED, HIGH);  
+		} else {
+			digitalWrite(LED, LOW);
+		}
+
+	}
+
+	switch(state) {
+		case STATE_TX:
+			delay(1000);
+			txNumber++;
+			sprintf(txpacket, "hello %d,Rssi:%d", txNumber, Rssi);
+			Serial.printf("\r\nsending packet \"%s\" , length %d\r\n", txpacket, strlen(txpacket));
+			Radio.Send((uint8_t *)txpacket, strlen(txpacket));
+			state=LOWPOWER;
+			break;
+		case STATE_RX:
+			Serial.println("into RX mode");
+			Radio.Rx(0);
+			state=LOWPOWER;
+			break;
+		case LOWPOWER:
+			Radio.IrqProcess();
+			break;
+		default:
+			break;
+	}
 }
